@@ -18,15 +18,22 @@ class Sprockets::ERBProcessor
   end
 
   def call(input)
-    engine = ::ERB.new(input[:data], nil, '<>')
-    engine.filename = input[:filename]
-
     context = input[:environment].context_class.new(input)
     klass = (class << context; self; end)
     klass.const_set(:ENV, context.env_proxy)
     klass.class_eval(&@block) if @block
 
-    data = engine.result(context.instance_eval('binding'))
-    context.metadata.merge(data: data)
+    if defined?(::Erubi)
+      engine = ::Erubi::Engine.new(input[:data], filename: input[:filename])
+
+      data = eval(engine.src, context.instance_eval('binding'))
+      context.metadata.merge(data: data)
+    else
+      engine = ::ERB.new(input[:data], nil, '<>')
+      engine.filename = input[:filename]
+
+      data = engine.result(context.instance_eval('binding'))
+      context.metadata.merge(data: data)
+    end
   end
 end
